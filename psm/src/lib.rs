@@ -60,7 +60,10 @@ extern_item! { {
 
     #[cfg(asm)]
     fn rust_psm_stack_direction() -> u8;
-    #[cfg(asm)]
+    #[cfg(all(
+        asm,
+        not(all(feature = "stack_pointer_inline_asm", target_arch = "x86_64"))
+    ))]
     fn rust_psm_stack_pointer() -> *mut u8;
 
     #[cfg(all(switchable_stack, not(target_os = "windows")))]
@@ -314,9 +317,23 @@ impl StackDirection {
 ///    padding applied;
 /// 2. Callee allocates more stack than was accounted for with padding, and accesses pages outside
 ///    the stack, invalidating the execution (by e.g. crashing).
-#[cfg(asm)]
+#[cfg(all(
+    asm,
+    not(all(feature = "stack_pointer_inline_asm", target_arch = "x86_64"))
+))]
 pub fn stack_pointer() -> *mut u8 {
     unsafe { rust_psm_stack_pointer() }
+}
+
+#[cfg(all(asm, feature = "stack_pointer_inline_asm", target_arch = "x86_64"))]
+#[inline]
+pub fn stack_pointer() -> *mut u8 {
+    use core::arch::asm;
+    let res: usize;
+    unsafe {
+        asm!("lea {}, [rsp - 16]", out(reg) res);
+    }
+    res as *mut u8
 }
 
 /// Macro that outputs its tokens only if `psm::on_stack` and `psm::replace_stack` are available.

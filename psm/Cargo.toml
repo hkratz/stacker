@@ -14,3 +14,6 @@ readme = "README.mkd"
 
 [build-dependencies]
 cc = "1.0.2"
+
+[features]
+stack_pointer_inline_asm = []
