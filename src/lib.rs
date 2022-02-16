@@ -87,6 +87,7 @@ pub fn grow<R, F: FnOnce() -> R>(stack_size: usize, callback: F) -> R {
 ///
 /// This function will return the amount of stack space left which will be used
 /// to determine whether a stack switch should be made or not.
+#[inline]
 pub fn remaining_stack() -> Option<usize> {
     let current_ptr = current_stack_ptr();
     get_stack_limit().map(|limit| current_ptr - limit)
@@ -94,6 +95,7 @@ pub fn remaining_stack() -> Option<usize> {
 
 psm_stack_information! (
     yes {
+        #[inline(always)]
         fn current_stack_ptr() -> usize {
             psm::stack_pointer() as usize
         }
