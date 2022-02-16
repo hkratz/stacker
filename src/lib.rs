@@ -23,6 +23,7 @@
 //! ```
 
 #![allow(improper_ctypes)]
+#![cfg_attr(feature = "fast_thread_local", feature(thread_local))]
 
 #[macro_use]
 extern crate cfg_if;
@@ -31,8 +32,6 @@ extern crate libc;
 extern crate winapi;
 #[macro_use]
 extern crate psm;
-
-use std::cell::Cell;
 
 /// Grows the call stack if necessary.
 ///
@@ -117,21 +116,59 @@ psm_stack_information! (
     }
 );
 
+#[cfg(not(feature = "fast_thread_local"))]
 thread_local! {
-    static STACK_LIMIT: Cell<Option<usize>> = Cell::new(unsafe {
+    static STACK_LIMIT: std::cell::Cell<Option<usize>> = std::cell::Cell::<_>::new(unsafe {
         guess_os_stack_limit()
     })
 }
 
+#[cfg(not(feature = "fast_thread_local"))]
 #[inline(always)]
 fn get_stack_limit() -> Option<usize> {
     STACK_LIMIT.with(|s| s.get())
 }
 
+#[cfg(not(feature = "fast_thread_local"))]
 #[inline(always)]
 #[allow(unused)]
 fn set_stack_limit(l: Option<usize>) {
     STACK_LIMIT.with(|s| s.set(l))
+}
+
+#[cfg(feature = "fast_thread_local")]
+#[thread_local]
+static mut STACK_LIMIT: Option<std::num::NonZeroUsize> = None;
+
+#[cfg(feature = "fast_thread_local")]
+#[inline(always)]
+fn get_stack_limit() -> Option<usize> {
+    unsafe {
+        match STACK_LIMIT {
+            Some(l) => Some(l.get()),
+            None => get_stack_limit_slow(),
+        }
+    }
+}
+
+#[cfg(feature = "fast_thread_local")]
+#[cold]
+fn get_stack_limit_slow() -> Option<usize> {
+    unsafe {
+        let res = guess_os_stack_limit();
+        STACK_LIMIT = res.map(|l| std::num::NonZeroUsize::new(l).expect("OS stack limit is zero"));
+        res
+    }
+}
+
+#[cfg(feature = "fast_thread_local")]
+#[inline(always)]
+#[allow(unused)]
+fn set_stack_limit(l: Option<usize>) {
+    unsafe {
+        STACK_LIMIT =
+            l.map(|l| std::num::NonZeroUsize::new(l).expect("trying to set zero stack limit"));
+    }
 }
 
 psm_stack_manipulation! {

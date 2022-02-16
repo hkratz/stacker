@@ -37,4 +37,5 @@ features = [
 cc = "1.0.2"
 
 [features]
-fast_path_optimization = ["psm/stack_pointer_inline_asm"]
+fast_thread_local = []
+fast_path_optimization = ["fast_thread_local", "psm/stack_pointer_inline_asm"]
